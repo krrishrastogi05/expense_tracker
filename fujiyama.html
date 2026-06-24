@@ -103,7 +103,7 @@
     </div>
     <div class="row">
       <label>Time of day</label>
-      <input id="timeSlider" type="range" min="0" max="100" value="22" />
+      <input id="timeSlider" type="range" min="0" max="100" value="62" />
     </div>
     <div class="row">
       <label>Petals</label>
@@ -192,7 +192,7 @@
     // ───────────────────────────────────────────────────────────────────────────
     // Lights
     // ───────────────────────────────────────────────────────────────────────────
-    const hemi = new THREE.HemisphereLight('#ffd9c0', '#4a3a55', 0.85);
+    const hemi = new THREE.HemisphereLight('#ffe4cf', '#6a5560', 0.95);
     scene.add(hemi);
 
     const sun = new THREE.DirectionalLight('#ffb27a', 2.4);
@@ -352,7 +352,7 @@
       const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
       const dummy = new THREE.Object3D();
       const colorArr = [];
-      const palette = ['#ff5fa2', '#ff8ec2', '#e23d7e', '#ffd6e8', '#c9347a'];
+      const palette = ['#ff7fb5', '#ff9ecb', '#ff6aa6', '#ffd0e6', '#f25f99'];
       let placed = 0;
       for (let i = 0; i < COUNT; i++) {
         // Scatter across the foreground but avoid the lake disc.
@@ -384,14 +384,13 @@
       const c = document.createElement('canvas'); c.width = c.height = 64;
       const ctx = c.getContext('2d');
       ctx.clearRect(0, 0, 64, 64);
-      // little cluster of dots
-      for (let i = 0; i < 7; i++) {
-        const x = 32 + Math.cos(i / 7 * Math.PI * 2) * 14 + (i === 6 ? -0 : 0);
-        const y = 32 + Math.sin(i / 7 * Math.PI * 2) * 14;
-        const r = i === 6 ? 13 : 9;
+      // A FILLED soft clump (overlapping blobs incl. a solid centre) — no hole,
+      // so it never reads as a ring / donut on the ground.
+      const dots = [[32, 32, 16], [24, 26, 10], [40, 26, 10], [25, 41, 10], [40, 41, 10], [32, 21, 9]];
+      for (const [x, y, r] of dots) {
         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
         g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(0.7, 'rgba(255,255,255,0.95)');
+        g.addColorStop(0.65, 'rgba(255,255,255,0.96)');
         g.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       }
@@ -529,8 +528,13 @@
     // ───────────────────────────────────────────────────────────────────────────
     // Cherry blossom (桜) trees
     // ───────────────────────────────────────────────────────────────────────────
-    const blossomMatPool = ['#ffc2dd', '#ffb3d1', '#ff9ec7', '#ffd9e8', '#f7a8c8'].map(c =>
-      new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, flatShading: true })
+    const blossomMatPool = ['#ffd3e8', '#ffc0de', '#ffaad2', '#ffe0ef', '#f9b6d6'].map(c =>
+      new THREE.MeshStandardMaterial({
+        color: c, roughness: 0.72, metalness: 0,
+        // gentle self-glow keeps the blossoms pink even in shadow / low light
+        emissive: new THREE.Color(c).multiplyScalar(0.28),
+        flatShading: false
+      })
     );
     const barkMat = new THREE.MeshStandardMaterial({ color: '#5a4334', roughness: 0.95 });
 
@@ -563,26 +567,30 @@
         tips.push([tipX, tipY, tipZ]);
       }
 
-      // Blossom canopy: clusters of low-poly icosahedrons -> fluffy pink cloud
+      // Blossom canopy: overlapping soft clusters forming a rounded pink dome.
+      // Subdivided icosahedrons (detail 1) + gentle jitter => smooth, not spiky.
       const canopyCenters = [[0, 8.5 * scale, 0], ...tips];
       canopyCenters.forEach(([cx, cy, cz], idx) => {
-        const clusters = idx === 0 ? 18 : 9;
-        const spread = idx === 0 ? 5.2 : 3.1;
+        const clusters = idx === 0 ? 22 : 10;
+        const spread = idx === 0 ? 4.6 : 2.7;
         for (let j = 0; j < clusters; j++) {
           const mat = blossomMatPool[(Math.random() * blossomMatPool.length) | 0];
-          const r = rand(1.4, 2.8) * scale;
-          const geo = new THREE.IcosahedronGeometry(r, 0);
-          // jitter vertices for an organic blob
+          const r = rand(2.0, 3.2) * scale;
+          const geo = new THREE.IcosahedronGeometry(r, 1);
+          // very light jitter keeps an organic edge without the spiky look
           const p = geo.attributes.position;
           for (let k = 0; k < p.count; k++) {
-            p.setXYZ(k, p.getX(k) * rand(0.8, 1.2), p.getY(k) * rand(0.8, 1.2), p.getZ(k) * rand(0.8, 1.2));
+            p.setXYZ(k, p.getX(k) * rand(0.94, 1.06), p.getY(k) * rand(0.94, 1.06), p.getZ(k) * rand(0.94, 1.06));
           }
           geo.computeVertexNormals();
           const blob = new THREE.Mesh(geo, mat);
+          // disc-distributed + dome-biased so the silhouette reads as one fluffy mound
+          const a = Math.random() * Math.PI * 2;
+          const rad = Math.sqrt(Math.random()) * spread;
           blob.position.set(
-            cx + rand(-spread, spread),
-            cy + rand(-spread * 0.6, spread * 0.7),
-            cz + rand(-spread, spread)
+            cx + Math.cos(a) * rad,
+            cy + rand(-spread * 0.35, spread * 0.8),
+            cz + Math.sin(a) * rad
           );
           blob.castShadow = true;
           tree.add(blob);
@@ -628,15 +636,20 @@
       const c = document.createElement('canvas'); c.width = c.height = 64;
       const ctx = c.getContext('2d');
       ctx.translate(32, 32);
-      ctx.fillStyle = '#ffd0e4';
-      // simple 5-notch petal
+      // soft top-to-bottom pink gradient petal
+      const grad = ctx.createLinearGradient(0, -22, 0, 22);
+      grad.addColorStop(0, '#ffe6f1');
+      grad.addColorStop(1, '#ff9ec7');
+      ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(0, -22);
-      ctx.bezierCurveTo(16, -20, 18, 8, 0, 22);
-      ctx.bezierCurveTo(-18, 8, -16, -20, 0, -22);
+      ctx.moveTo(0, -20);
+      ctx.bezierCurveTo(14, -18, 15, 10, 0, 22);
+      ctx.bezierCurveTo(-15, 10, -14, -18, 0, -20);
       ctx.fill();
-      ctx.fillStyle = '#ff9bc4';
-      ctx.beginPath(); ctx.ellipse(0, 4, 4, 10, 0, 0, Math.PI * 2); ctx.fill();
+      // little notch at the tip — the signature sakura petal shape
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath(); ctx.arc(0, 22, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
     }
     const PETAL_COUNT = 900;
@@ -739,7 +752,7 @@
     };
     const timeSlider = document.getElementById('timeSlider');
     timeSlider.oninput = () => applyTime(parseInt(timeSlider.value, 10) / 100);
-    applyTime(0.22);
+    applyTime(0.62);
 
     // ───────────────────────────────────────────────────────────────────────────
     // Resize + render loop
